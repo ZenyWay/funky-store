@@ -1,0 +1,95 @@
+{
+  "name": "funky-store",
+  "version": "0.1.0",
+  "description": "extremely lightweight FSA-based functional store, for managing application or module state with action-triggered reducers, effects and triggers",
+  "main": "dist/index.min.js",
+  "typings": "dist/index.d.ts",
+  "scripts": {
+    "predist": "mkdirp dist && rimraf dist/*",
+    "dist": "tsc -p src --outDir dist",
+    "format": "prettier-standard \"{bin,example,src,spec}/**/*.[jt]@(s|sx)\"",
+    "postdist": "npm run uglify",
+    "preexample": "rimraf example/index.js",
+    "example": "npm run example:bundle && npm run example:serve",
+    "example:bundle": "browserify example/index.ts -p [tsify -p example] -g uglifyify -p bundle-collapser/plugin -p [ common-shakeify -v ] | terser -c -m toplevel -o example/index.js",
+    "example:debug": "concurrently \"npm run example:debug:bundle\" \"npm run example:serve\"",
+    "example:debug:bundle": "watchify example/index.ts -p [tsify -p example] -o example/index.js --debug -v",
+    "example:serve": "live-server --port=6510 --entry-file=index.html --ignore=*.ts,tsconfig.json example",
+    "prepublish": "npm run dist",
+    "pretest": "npm run dist",
+    "test": "tape spec/**/*.spec.js",
+    "test:web:serve": "live-server --port=6510 --entry-file=index.html spec",
+    "pretest:web": "rimraf spec/index.js && npm run pretest",
+    "test:web": "browserify spec/lib/browser.js -g uglifyify -p bundle-collapser/plugin -p [ common-shakeify -v ] | terser -c -m toplevel -o spec/index.js && npm run test:web:serve",
+    "uglify": "npm run uglify:index && npm run uglify:utils",
+    "uglify:index": "terser dist/index.js -c -m toplevel -o dist/index.min.js",
+    "uglify:utils": "terser dist/utils.js -c -m toplevel -o dist/utils.min.js"
+  },
+  "keywords": [
+    "action",
+    "effect",
+    "event",
+    "functional",
+    "reactive",
+    "reducer",
+    "state"
+  ],
+  "author": {
+    "name": "Stephane M. Catala",
+    "email": "stephane@zenyway.com"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zenyway/funky-store.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zenyway/funky-store/issues"
+  },
+  "homepage": "https://github.com/zenyway/funky-store#readme",
+  "devDependencies": {
+    "@types/es6-promise": "3.3.0",
+    "@typescript-eslint/eslint-plugin": "2.1.0",
+    "@typescript-eslint/parser": "2.1.0",
+    "basic-cursors": "3.0.0",
+    "basic-fsa-factories": "2.0.0",
+    "browserify": "16.5.0",
+    "bundle-collapser": "1.3.0",
+    "common-shakeify": "0.4.6",
+    "concurrently": "4.1.2",
+    "husky": "3.0.5",
+    "lint-staged": "9.2.5",
+    "live-server": "1.2.1",
+    "prettier-standard": "14.0.5",
+    "rimraf": "3.0.0",
+    "tape": "4.11.0",
+    "terser": "4.3.0",
+    "tsify": "4.0.1",
+    "typescript": "3.6.2",
+    "uglifyify": "5.0.2",
+    "watchify": "3.11.1",
+    "xterm": "3.14.5"
+  },
+  "dependencies": {},
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,css,md}": [
+      "prettier-standard",
+      "git add"
+    ]
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true
+  },
+  "standard": {
+    "parser": "@typescript-eslint/parser",
+    "plugins": [
+      "@typescript-eslint"
+    ]
+  }
+}

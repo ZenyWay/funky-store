@@ -1,0 +1,180 @@
+/**
+ * @license MIT
+ * @author Stephane M. Catala <stephane@zenyway.com>
+ *
+ * Copyright (C) 2019, Stephane M. Catala <stephane@zenyway.com>
+ *
+ * Permission is hereby granted, free of charge,
+ * to any person obtaining a copy of this software
+ * and associated documentation files (the "Software"),
+ * to deal in the Software without restriction,
+ * including without limitation the rights to use,
+ * copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice
+ * shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+ * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+export interface StoreOptions {
+  readonly debug: (label: 'ACTION' | 'STATE', o: object) => void
+}
+
+export interface Store<
+  S extends Readonly<S>,
+  A extends StandardAction = StandardAction
+  > {
+  addEffects<E extends EffectSpecs<S>> (specs: E): Store<S, A | EffectAction<E>>
+  addReducers<R extends ReducerSpecs<S>> (
+    specs: R
+  ): Store<S, A | ReducerAction<R>>
+  addTriggers<T extends TriggerSpecs<S>> (
+    specs: T
+  ): Store<S, A | TriggerAction<T>>
+  dispatch (action?: void | false | A): void
+}
+
+export type EffectAction<E> = E extends EffectSpecs<any, infer I, infer O>
+  ? I | O
+  : never
+export type ReducerAction<E> = E extends ReducerSpecs<any, infer I> ? I : never
+export type TriggerAction<E> = E extends TriggerSpecs<any, infer I, infer O>
+  ? I | O
+  : never
+
+export type EffectSpecs<
+  S extends Readonly<S>,
+  I extends StandardAction = StandardAction,
+  O extends void | StandardAction = I
+  > = {
+    [T in ActionType<I>]?:
+    | Effect<S, ActionPayload<I, T>, O>[]
+    | Effect<S, ActionPayload<I, T>, O>
+  }
+export interface Effect<
+  S extends Readonly<S>,
+  P = any,
+  O extends void | StandardAction = void | StandardAction
+  > {
+  (state: S, payload?: P): void | false | PromiseLike<void | false | O>
+}
+
+export type ReducerSpecs<
+  S extends Readonly<S>,
+  I extends StandardAction = StandardAction
+  > = {
+    [T in ActionType<I>]?:
+    | Reducer<S, ActionPayload<I, T>>[]
+    | Reducer<S, ActionPayload<I, T>>
+  }
+export interface Reducer<S extends Readonly<S>, P = any> {
+  (state: S, payload?: P): S
+}
+
+export type TriggerSpecs<
+  S extends Readonly<S>,
+  I extends StandardAction = StandardAction,
+  O extends void | StandardAction = I
+  > = {
+    [T in ActionType<I>]?:
+    | Trigger<S, ActionPayload<I, T>, O>[]
+    | Trigger<S, ActionPayload<I, T>, O>
+  }
+export interface Trigger<
+  S extends Readonly<S>,
+  P = any,
+  O extends void | StandardAction = void | StandardAction
+  > {
+  (state: S, payload?: P): void | false | O | (void | false | O)[]
+}
+
+export interface StandardAction<T extends string = string, P = any> {
+  readonly type: T
+  readonly payload?: P
+}
+export declare type ActionType<A> = A extends StandardAction<infer T, any>
+  ? T
+  : never
+export declare type ActionPayload<
+  A,
+  T extends ActionType<A> = ActionType<A>
+  > = A extends StandardAction<T, infer P> ? P : never
+
+export default function <
+  S,
+  I extends Partial<Readonly<S>> = Partial<Readonly<S>>
+> (
+  init: I,
+  opts = Object.create(null) as Partial<StoreOptions>
+): Store<S, never> {
+  let state = init as Readonly<S>
+  let effects = Object.create(null) as KVMap<Effect<S>[]>
+  let triggers = Object.create(null) as KVMap<Trigger<S>[]>
+  let reducers = Object.create(null) as KVMap<Reducer<S>[]>
+
+  const debug = opts.debug
+  const store = {
+    addEffects: appendEntries(effects),
+    addReducers: appendEntries(reducers),
+    addTriggers: appendEntries(triggers),
+    dispatch
+  } as Store<S, never>
+  return { ...store }
+
+  function dispatch (action?: void | false | StandardAction): void {
+    if (!action) return
+    const type = (action as StandardAction).type
+    const payload = (action as StandardAction).payload
+    if (debug) debug('ACTION', action)
+    let update = state
+    for (const reducer of reducers[type] || []) {
+      update = reducer(update, payload) // throw on unhandled error
+    }
+    if (update !== state) {
+      state = update
+      if (debug) debug('STATE', state)
+    }
+    for (const effect of effects[type] || []) {
+      Promise.resolve(effect(state, payload))
+        .then(dispatch)
+        .catch(err => {
+          throw err // throw on unhandled error
+        })
+    }
+    for (const trigger of triggers[type] || []) {
+      const actions = ([] as StandardAction[]).concat((trigger(
+        state,
+        payload
+      ) || []) as StandardAction[])
+      for (const action of actions) {
+        dispatch(action)
+      }
+    }
+  }
+
+  /**
+   * mutates `dict`
+   */
+  function appendEntries<T> (dict: KVMap<T[]>) {
+    return function (entries: KVMap<T[] | T>) {
+      for (const key of Object.keys(entries)) {
+        dict[key] = [].concat(dict[key] || [], entries[key] || [])
+      }
+      return { ...store }
+    }
+  }
+}
+
+interface KVMap<T> {
+  [key: string]: T
+}
