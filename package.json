@@ -63,7 +63,7 @@
     "prettier-standard": "16.4.1",
     "rimraf": "3.0.2",
     "tape": "5.0.1",
-    "terser": "4.8.0",
+    "terser": "4.8.1",
     "tsify": "4.0.2",
     "typescript": "3.9.7",
     "uglifyify": "5.0.2",
